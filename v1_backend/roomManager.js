@@ -1,0 +1,124 @@
+import { nanoid } from 'nanoid';
+
+class RoomManager {
+  constructor() {
+    this.rooms = new Map();
+  }
+
+  // Generate a unique 6-character room code
+  generateRoomCode() {
+    let code;
+    do {
+      code = nanoid(6).toUpperCase();
+    } while (this.rooms.has(code));
+    return code;
+  }
+
+  // Create a new room
+  createRoom(hostSocketId) {
+    const roomCode = this.generateRoomCode();
+    const room = {
+      code: roomCode,
+      host: hostSocketId,
+      players: new Map(),
+      gameState: {
+        started: false,
+        currentGame: null,
+        scores: {}
+      },
+      createdAt: Date.now()
+    };
+    
+    this.rooms.set(roomCode, room);
+    console.log(`Room created: ${roomCode}`);
+    return room;
+  }
+
+  // Get room by code
+  getRoom(roomCode) {
+    return this.rooms.get(roomCode.toUpperCase());
+  }
+
+  // Add player to room
+  addPlayer(roomCode, playerId, playerName, socketId) {
+    const room = this.getRoom(roomCode);
+    if (!room) return null;
+
+    const player = {
+      id: playerId,
+      name: playerName,
+      socketId:  socketId,
+      connected: true,
+      joinedAt: Date.now()
+    };
+
+    room.players.set(playerId, player);
+    room.gameState.scores[playerId] = 0;
+    
+    console.log(`Player ${playerName} joined room ${roomCode}`);
+    return player;
+  }
+
+  // Remove player from room
+  removePlayer(roomCode, playerId) {
+    const room = this.getRoom(roomCode);
+    if (!room) return false;
+
+    room.players.delete(playerId);
+    delete room.gameState.scores[playerId];
+    
+    // If host disconnects or room is empty, delete room
+    if (room.players.size === 0) {
+      this.rooms.delete(roomCode);
+      console.log(`Room ${roomCode} deleted (empty)`);
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Get all players in a room
+  getPlayers(roomCode) {
+    const room = this.getRoom(roomCode);
+    if (!room) return [];
+    
+    return Array.from(room.players.values());
+  }
+
+  // Update game state
+  updateGameState(roomCode, updates) {
+    const room = this.getRoom(roomCode);
+    if (!room) return null;
+
+    room.gameState = { ...room.gameState, ...updates };
+    return room.gameState;
+  }
+
+  // Find room by socket ID
+  findRoomBySocket(socketId) {
+    for (const [code, room] of this.rooms.entries()) {
+      if (room.host === socketId) {
+        return { code, room, role: 'host' };
+      }
+      
+      for (const player of room.players.values()) {
+        if (player.socketId === socketId) {
+          return { code, room, role: 'player', playerId: player.id };
+        }
+      }
+    }
+    return null;
+  }
+
+  // Get room statistics
+  getRoomStats() {
+    return {
+      totalRooms: this.rooms.size,
+      totalPlayers: Array.from(this.rooms.values()).reduce(
+        (sum, room) => sum + room.players.size, 0
+      )
+    };
+  }
+}
+
+export default RoomManager;

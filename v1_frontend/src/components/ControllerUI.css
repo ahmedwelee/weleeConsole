@@ -1,0 +1,146 @@
+.controller-ui {
+  flex: 1;
+  display:  flex;
+  flex-direction:  column;
+  padding: 20px;
+  gap: 20px;
+}
+
+.controller-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex:  1;
+}
+
+.left-controls,
+.right-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Joystick */
+.joystick-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.joystick-base {
+  width: 180px;
+  height: 180px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position:  relative;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.joystick-stick {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  transition: transform 0.05s ease;
+}
+
+.joystick-label {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+/* Action Buttons */
+.button-group {
+  display: flex;
+  gap: 20px;
+}
+
+.game-button {
+  width: 90px;
+  height: 90px;
+  border-radius:  50%;
+  border: none;
+  font-size: 2rem;
+  font-weight: bold;
+  color: white;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.game-button. btn-a {
+  background: linear-gradient(135deg, #E74C3C, #C0392B);
+}
+
+.game-button.btn-b {
+  background: linear-gradient(135deg, #F39C12, #E67E22);
+}
+
+.game-button: active,
+.game-button.active {
+  transform: scale(0.9);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* D-Pad */
+.dpad-container {
+  display: flex;
+  justify-content: center;
+}
+
+.dpad {
+  width: 200px;
+  height: 200px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 5px;
+}
+
+.dpad-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  font-size: 1.5rem;
+  color: white;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+. dpad-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.dpad-left {
+  grid-column: 1;
+  grid-row:  2;
+}
+
+. dpad-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.dpad-down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.dpad-btn:active,
+.dpad-btn. active {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .controller-layout {
+    flex-direction: column;
+    gap: 40px;
+  }
+}

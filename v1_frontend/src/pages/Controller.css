@@ -1,0 +1,70 @@
+.controller-container {
+  min-height: 100vh;
+  background: #16213e;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.controller-header {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.player-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.player-name {
+  font-size:  1.2rem;
+  font-weight:  bold;
+}
+
+.room-badge {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.status {
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+}
+
+.status.connected {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ECC71;
+}
+
+.waiting-screen {
+  flex: 1;
+  display:  flex;
+  flex-direction:  column;
+  align-items:  center;
+  justify-content:  center;
+  text-align: center;
+  padding: 40px;
+}
+
+.waiting-screen h2 {
+  font-size:  2rem;
+  margin-bottom: 15px;
+}
+
+.controller-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+}
