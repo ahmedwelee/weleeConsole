@@ -81,7 +81,7 @@
   background: linear-gradient(135deg, #F39C12, #E67E22);
 }
 
-.game-button: active,
+.game-button:active,
 .game-button.active {
   transform: scale(0.9);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
