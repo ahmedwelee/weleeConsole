@@ -4,6 +4,8 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import RoomManager from './roomManager.js';
+import QuizGenerator from './quizGenerator.js';
+import QuizGameManager from './quizGameManager.js';
 
 dotenv.config();
 
@@ -17,6 +19,8 @@ const io = new Server(httpServer, {
 });
 
 const roomManager = new RoomManager();
+const quizGenerator = new QuizGenerator();
+const quizGameManager = new QuizGameManager();
 
 app.use(cors({
   origin: [
@@ -143,6 +147,106 @@ io.on('connection', (socket) => {
       io.to(roomCode).emit('game:ended', {
         finalScores:  gameState.scores
       });
+    }
+  });
+
+  // QUIZ: Start quiz battle
+  socket.on('quiz:start', async ({ roomCode }, callback) => {
+    try {
+      const room = roomManager.getRoom(roomCode);
+      if (!room) {
+        return callback({ success: false, error: 'Room not found' });
+      }
+
+      const players = roomManager.getPlayers(roomCode);
+      if (players.length === 0) {
+        return callback({ success: false, error: 'No players in room' });
+      }
+
+      console.log(`Generating quiz questions for room ${roomCode}...`);
+      const questions = await quizGenerator.generateQuestions(20);
+      
+      const game = quizGameManager.createGame(roomCode, questions);
+      
+      const scores = {};
+      players.forEach(player => {
+        scores[player.id] = 0;
+      });
+      game.scores = scores;
+
+      callback({ success: true, totalQuestions: questions.length });
+
+      console.log(`Quiz created for room ${roomCode} with ${questions.length} questions`);
+    } catch (error) {
+      console.error('Error starting quiz:', error);
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  // QUIZ: Get current question
+  socket.on('quiz:get-question', ({ roomCode }, callback) => {
+    const question = quizGameManager.getCurrentQuestion(roomCode);
+    if (question) {
+      callback({ success: true, question });
+    } else {
+      callback({ success: false, error: 'No active question' });
+    }
+  });
+
+  // QUIZ: Submit answer
+  socket.on('quiz:submit-answer', ({ roomCode, playerId, answerIndex }, callback) => {
+    const result = quizGameManager.submitAnswer(roomCode, playerId, answerIndex);
+    
+    if (result) {
+      callback({ success: true, ...result });
+      
+      const game = quizGameManager.getGame(roomCode);
+      const room = roomManager.getRoom(roomCode);
+      
+      if (room && game) {
+        io.to(room.host).emit('quiz:answer-submitted', {
+          playerId,
+          answerIndex,
+          isCorrect: result.isCorrect,
+          scores: game.scores
+        });
+      }
+    } else {
+      callback({ success: false, error: 'Failed to submit answer' });
+    }
+  });
+
+  // QUIZ: Next question
+  socket.on('quiz:next-question', ({ roomCode }, callback) => {
+    const result = quizGameManager.nextQuestion(roomCode);
+    
+    if (result) {
+      callback({ success: true, ...result });
+      
+      if (result.finished) {
+        io.to(roomCode).emit('quiz:finished', {
+          finalScores: result.finalScores
+        });
+        
+        setTimeout(() => {
+          quizGameManager.deleteGame(roomCode);
+        }, 60000);
+      } else {
+        const question = quizGameManager.getCurrentQuestion(roomCode);
+        io.to(roomCode).emit('quiz:new-question', { question });
+      }
+    } else {
+      callback({ success: false, error: 'Failed to get next question' });
+    }
+  });
+
+  // QUIZ: Get scores
+  socket.on('quiz:get-scores', ({ roomCode }, callback) => {
+    const game = quizGameManager.getGame(roomCode);
+    if (game) {
+      callback({ success: true, scores: game.scores });
+    } else {
+      callback({ success: false, error: 'Game not found' });
     }
   });
 
