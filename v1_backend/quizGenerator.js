@@ -10,14 +10,45 @@ class QuizGenerator {
     });
   }
 
-  async generateQuestions(count = 20) {
+  async generateQuestions(count = 20, settings = {}) {
+    const {
+      language = 'English',
+      category = 'History',
+      difficulty = 'Medium'
+    } = settings;
+
     try {
-      const prompt = `Generate exactly ${count} multiple choice quiz questions. Each question should have:
+      const languageMap = {
+        'Arabic': 'Generate questions in Arabic language.',
+        'French': 'Generate questions in French language.',
+        'English': 'Generate questions in English language.'
+      };
+      const languageInstruction = languageMap[language] || languageMap['English'];
+
+      const categoryMap = {
+        'History': 'History questions',
+        'Geography': 'Geography questions',
+        'Football': 'Football/Soccer questions',
+        'Countries and Capitals': 'Countries and their Capitals questions',
+        'Electronics': 'Electronics and technology questions',
+        'Famous People': 'Famous people and celebrities questions',
+        'Movies and Music': 'Movies and Music questions'
+      };
+      const categoryInstruction = categoryMap[category] || categoryMap['History'];
+
+      const difficultyMap = {
+        'Easy': 'easy difficulty - simple and straightforward',
+        'Medium': 'medium difficulty - moderate challenge',
+        'Hard': 'hard difficulty - challenging and complex'
+      };
+      const difficultyInstruction = difficultyMap[difficulty] || difficultyMap['Medium'];
+
+      const prompt = `Generate exactly ${count} multiple choice quiz questions about ${categoryInstruction} with ${difficultyInstruction}. ${languageInstruction}
+
+Each question should have:
 - A clear question
 - Exactly 4 options (A, B, C, D)
 - One correct answer
-- Mix of difficulty levels
-- Various topics (general knowledge, science, history, geography, entertainment)
 
 Format as JSON array:
 [

@@ -21,6 +21,20 @@
   margin-bottom: 1rem;
 }
 
+.settings-info {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 1.5rem;
+  border-radius: 10px;
+  margin: 1.5rem 0;
+  backdrop-filter: blur(10px);
+}
+
+.settings-info p {
+  margin: 0.5rem 0;
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
 .quiz-header {
   display: flex;
   justify-content: space-between;
