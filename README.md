@@ -2,6 +2,10 @@
 
 A multiplayer gaming platform featuring Quiz Battle - an interactive quiz game where players use their phones as controllers.
 
+## 🚀 Quick Start
+
+**New to WeleeConsole?** Check out the [Quick Start Guide](QUICKSTART.md) to get up and running in 5 minutes!
+
 ## Features
 
 - **Quiz Battle Game**: Multiplayer quiz game with real-time scoring
