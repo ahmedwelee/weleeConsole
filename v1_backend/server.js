@@ -82,15 +82,21 @@ io.on('connection', (socket) => {
 
             socket.join(code);
 
+            // Notify host
             io.to(room.host).emit('player:joined', {
                 player,
                 players: roomManager.getPlayers(code)
             });
 
+            // Determine if this is the first player
+            const firstPlayerId = roomManager.getFirstPlayerId(code);
+            const isFirstPlayer = player.id === firstPlayerId;
+
             callback({
                 success: true,
                 playerId: player.id,
-                roomCode: code
+                roomCode: code,
+                isFirstPlayer
             });
         } catch (err) {
             callback({ success: false, error: err.message });
@@ -163,8 +169,14 @@ io.on('connection', (socket) => {
         return callback({ success: false, error: 'No players in room' });
       }
 
-      console.log(`Generating quiz questions for room ${roomCode}...`);
-      const questions = await quizGenerator.generateQuestions(20);
+      // Get quiz settings
+      const settings = roomManager.getQuizSettings(roomCode);
+      if (!settings.locked) {
+        return callback({ success: false, error: 'Quiz settings not locked' });
+      }
+
+      console.log(`Generating quiz questions for room ${roomCode} with settings:`, settings);
+      const questions = await quizGenerator.generateQuestions(20, settings);
       
       const game = quizGameManager.createGame(roomCode, questions);
       
@@ -179,6 +191,78 @@ io.on('connection', (socket) => {
       console.log(`Quiz created for room ${roomCode} with ${questions.length} questions`);
     } catch (error) {
       console.error('Error starting quiz:', error);
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  // QUIZ: Update settings (Player 1 only)
+  socket.on('quiz:update-settings', ({ roomCode, playerId, settings }, callback) => {
+    try {
+      const room = roomManager.getRoom(roomCode);
+      if (!room) {
+        return callback({ success: false, error: 'Room not found' });
+      }
+
+      // Check if settings are already locked
+      if (room.quizSettings.locked) {
+        return callback({ success: false, error: 'Settings are locked' });
+      }
+
+      // Check if this is Player 1
+      const firstPlayerId = roomManager.getFirstPlayerId(roomCode);
+      if (playerId !== firstPlayerId) {
+        return callback({ success: false, error: 'Only Player 1 can change settings' });
+      }
+
+      // Update settings
+      const updatedSettings = roomManager.updateQuizSettings(roomCode, settings);
+      
+      // Broadcast to all players in room
+      io.to(roomCode).emit('quiz:settings-updated', { settings: updatedSettings });
+
+      callback({ success: true, settings: updatedSettings });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  // QUIZ: Lock settings (Player 1 only)
+  socket.on('quiz:lock-settings', ({ roomCode, playerId }, callback) => {
+    try {
+      const room = roomManager.getRoom(roomCode);
+      if (!room) {
+        return callback({ success: false, error: 'Room not found' });
+      }
+
+      // Check if this is Player 1
+      const firstPlayerId = roomManager.getFirstPlayerId(roomCode);
+      if (playerId !== firstPlayerId) {
+        return callback({ success: false, error: 'Only Player 1 can lock settings' });
+      }
+
+      // Lock settings
+      roomManager.lockQuizSettings(roomCode);
+      
+      // Broadcast to all players in room
+      io.to(roomCode).emit('quiz:settings-locked', { settings: room.quizSettings });
+
+      callback({ success: true });
+    } catch (error) {
+      callback({ success: false, error: error.message });
+    }
+  });
+
+  // QUIZ: Get settings
+  socket.on('quiz:get-settings', ({ roomCode }, callback) => {
+    try {
+      const settings = roomManager.getQuizSettings(roomCode);
+      if (!settings) {
+        return callback({ success: false, error: 'Room not found' });
+      }
+
+      const firstPlayerId = roomManager.getFirstPlayerId(roomCode);
+      callback({ success: true, settings, firstPlayerId });
+    } catch (error) {
       callback({ success: false, error: error.message });
     }
   });

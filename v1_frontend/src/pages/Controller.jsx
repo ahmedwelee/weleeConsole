@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import socketService from '../utils/socket.js';
 import ControllerUI from '../components/ControllerUI';
 import QuizController from '../components/QuizController';
+import QuizSettingsPanel from '../components/QuizSettingsPanel';
 import './Controller.css';
 
 function Controller() {
@@ -16,6 +17,9 @@ function Controller() {
   const [error, setError] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
   const [gameName, setGameName] = useState('');
+  const [isFirstPlayer, setIsFirstPlayer] = useState(false);
+  const [showQuizSettings, setShowQuizSettings] = useState(false);
+  const [quizSettingsLocked, setQuizSettingsLocked] = useState(false);
 
   useEffect(() => {
     const socket = socketService.connect();
@@ -28,6 +32,7 @@ function Controller() {
 
         if (response.success) {
           setPlayerId(response.playerId);
+          setIsFirstPlayer(response.isFirstPlayer || false);
           setConnected(true);
         } else {
           setError(response.error);
@@ -38,13 +43,29 @@ function Controller() {
 
     // Listen for game events
     socket.on('game:started', ({ gameName: game }) => {
-      setGameStarted(true);
       setGameName(game);
+      if (game === 'quiz') {
+        setShowQuizSettings(true);
+        setQuizSettingsLocked(false);
+      } else {
+        setGameStarted(true);
+      }
       console.log('Game started:', game);
+    });
+
+    socket.on('quiz:settings-locked', () => {
+      setQuizSettingsLocked(true);
+      // Delay to allow settings to be sent to backend
+      setTimeout(() => {
+        setShowQuizSettings(false);
+        setGameStarted(true);
+      }, 1500);
     });
 
     socket.on('game:ended', ({ finalScores }) => {
       setGameStarted(false);
+      setShowQuizSettings(false);
+      setQuizSettingsLocked(false);
       console.log('Game ended:', finalScores);
     });
 
@@ -54,6 +75,10 @@ function Controller() {
     });
 
     return () => {
+      socket.off('game:started');
+      socket.off('quiz:settings-locked');
+      socket.off('game:ended');
+      socket.off('room:closed');
       socketService.disconnect();
     };
   }, [roomCode, playerName, navigate]);
@@ -62,6 +87,10 @@ function Controller() {
     if (connected && playerId) {
       socketService.sendInput(roomCode, playerId, input);
     }
+  };
+
+  const handleQuizSettingsLocked = () => {
+    setQuizSettingsLocked(true);
   };
 
   if (error) {
@@ -92,11 +121,19 @@ function Controller() {
         </div>
       </header>
 
-      {! gameStarted ? (
+      {!gameStarted && !showQuizSettings ? (
         <div className="waiting-screen">
           <h2>⏳ Waiting for game to start...</h2>
           <p>The host will start the game soon</p>
         </div>
+      ) : showQuizSettings ? (
+        <QuizSettingsPanel
+          roomCode={roomCode}
+          playerId={playerId}
+          isFirstPlayer={isFirstPlayer}
+          onSettingsLocked={handleQuizSettingsLocked}
+          socketService={socketService}
+        />
       ) : (
         <>
           {gameName === 'quiz' ? (

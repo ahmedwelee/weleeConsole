@@ -26,6 +26,12 @@ class RoomManager {
         currentGame: null,
         scores: {}
       },
+      quizSettings: {
+        language: 'English',
+        category: 'History',
+        difficulty: 'Medium',
+        locked: false
+      },
       createdAt: Date.now()
     };
     
@@ -118,6 +124,43 @@ class RoomManager {
         (sum, room) => sum + room.players.size, 0
       )
     };
+  }
+
+  // Get first player ID in room
+  getFirstPlayerId(roomCode) {
+    const room = this.getRoom(roomCode);
+    if (!room || room.players.size === 0) return null;
+    
+    const players = Array.from(room.players.values());
+    // Sort by joinedAt to get the first player
+    players.sort((a, b) => a.joinedAt - b.joinedAt);
+    return players[0].id;
+  }
+
+  // Update quiz settings
+  updateQuizSettings(roomCode, settings) {
+    const room = this.getRoom(roomCode);
+    if (!room) return null;
+
+    room.quizSettings = { ...room.quizSettings, ...settings };
+    return room.quizSettings;
+  }
+
+  // Lock quiz settings
+  lockQuizSettings(roomCode) {
+    const room = this.getRoom(roomCode);
+    if (!room) return false;
+
+    room.quizSettings.locked = true;
+    return true;
+  }
+
+  // Get quiz settings
+  getQuizSettings(roomCode) {
+    const room = this.getRoom(roomCode);
+    if (!room) return null;
+
+    return room.quizSettings;
   }
 }
 

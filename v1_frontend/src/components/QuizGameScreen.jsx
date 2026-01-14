@@ -4,6 +4,7 @@ import './QuizGameScreen.css';
 
 function QuizGameScreen({ roomCode, players, onEndGame }) {
   const [loading, setLoading] = useState(true);
+  const [waitingForSettings, setWaitingForSettings] = useState(true);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [totalQuestions, setTotalQuestions] = useState(20);
@@ -13,6 +14,7 @@ function QuizGameScreen({ roomCode, players, onEndGame }) {
   const [correctAnswer, setCorrectAnswer] = useState(null);
   const [playerAnswers, setPlayerAnswers] = useState({});
   const [gameFinished, setGameFinished] = useState(false);
+  const [quizSettings, setQuizSettings] = useState(null);
 
   useEffect(() => {
     const socket = socketService.getSocket();
@@ -23,13 +25,22 @@ function QuizGameScreen({ roomCode, players, onEndGame }) {
     });
     setScores(initializeScores);
 
-    socketService.getSocket().emit('quiz:start', { roomCode }, (response) => {
-      if (response.success) {
-        setTotalQuestions(response.totalQuestions);
-        loadQuestion();
-      } else {
-        alert('Failed to start quiz: ' + response.error);
-      }
+    // Wait for settings to be locked before starting quiz
+    socket.on('quiz:settings-locked', ({ settings }) => {
+      setQuizSettings(settings);
+      setWaitingForSettings(false);
+      
+      // Start quiz after settings are locked
+      setTimeout(() => {
+        socketService.getSocket().emit('quiz:start', { roomCode }, (response) => {
+          if (response.success) {
+            setTotalQuestions(response.totalQuestions);
+            loadQuestion();
+          } else {
+            alert('Failed to start quiz: ' + response.error);
+          }
+        });
+      }, 500);
     });
 
     socket.on('quiz:answer-submitted', ({ playerId, answerIndex, isCorrect, scores: updatedScores }) => {
@@ -48,6 +59,7 @@ function QuizGameScreen({ roomCode, players, onEndGame }) {
     return () => {
       socket.off('quiz:answer-submitted');
       socket.off('quiz:finished');
+      socket.off('quiz:settings-locked');
     };
   }, [roomCode, players]);
 
@@ -112,11 +124,29 @@ function QuizGameScreen({ roomCode, players, onEndGame }) {
     return [...players].sort((a, b) => (scores[b.id] || 0) - (scores[a.id] || 0));
   };
 
+  if (waitingForSettings) {
+    return (
+      <div className="quiz-screen">
+        <div className="loading-message">
+          <h2>⚙️ Waiting for Quiz Configuration...</h2>
+          <p>Player 1 is setting up the quiz</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="quiz-screen">
         <div className="loading-message">
           <h2>🎯 Generating Quiz Questions...</h2>
+          {quizSettings && (
+            <div className="settings-info">
+              <p>Language: {quizSettings.language}</p>
+              <p>Category: {quizSettings.category}</p>
+              <p>Difficulty: {quizSettings.difficulty}</p>
+            </div>
+          )}
           <p>Please wait while we prepare your quiz</p>
         </div>
       </div>
