@@ -34,9 +34,16 @@ Quiz Battle is a multiplayer quiz game integrated into the WeleeConsole platform
    ```
 
 2. Configure OpenAI API key in `.env`:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your OpenAI API key
    ```
-   OPENAI_API_KEY=your_actual_api_key_here
+   
    ```
+   OPENAI_API_KEY=sk-proj-your-actual-api-key-here
+   ```
+   
+   **📖 For detailed setup instructions, see [OPENAI_SETUP.md](OPENAI_SETUP.md)**
    
    Note: If the API key is not configured or invalid, the game will use fallback questions automatically.
 
