@@ -15,7 +15,7 @@ This guide will help you configure your OpenAI API key for the Quiz Battle game.
 
 Your key will look like:
 ```
-sk-proj-Eyh2paUI-hP-E4Hoz7DdMlidFWNFps_5sO_R0T3iLZuz9vH6y5fwfR_LfexZ...
+sk-proj-abcd1234efgh5678ijklmnop9012qrstuvwx3456yzABCDEF7890...
 ```
 
 ### Step 2: Configure the Backend
@@ -200,7 +200,7 @@ cp .env.example .env
 nano .env
 
 # 4. Paste your API key (the one you got from OpenAI)
-# OPENAI_API_KEY=sk-proj-Eyh2paUI-hP-E4Hoz7DdMlidFWNFps_5sO_R0T...
+# OPENAI_API_KEY=sk-proj-abcd1234efgh5678ijklmnop9012qrstuvwx3456...
 
 # 5. Save and close
 

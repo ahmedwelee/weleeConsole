@@ -70,7 +70,7 @@ npm install
 
 **Important**: Your API key should look like this:
 ```
-sk-proj-Eyh2paUI-hP-E4Hoz7DdMlidFWNFps_5sO_R0T...
+sk-proj-abcd1234efgh5678ijklmnop9012qrstuvwx3456yzABCDEF7890...
 ```
 
 #### Start the Backend Server
