@@ -182,8 +182,8 @@ If you want to play across devices on your local network:
 
 ## Need Help?
 
-- Check the main [README.md](../README.md)
-- Review [QUIZ_BATTLE.md](../QUIZ_BATTLE.md) for game details
+- Check the main [README.md](README.md)
+- Review [QUIZ_BATTLE.md](QUIZ_BATTLE.md) for game details
 - Create an issue on GitHub
 - Verify your `.env` file is not tracked in git: `git status`
 
