@@ -18,13 +18,14 @@ class QuizGenerator {
     } = settings;
 
     try {
-      const languageInstruction = {
+      const languageMap = {
         'Arabic': 'Generate questions in Arabic language.',
         'French': 'Generate questions in French language.',
         'English': 'Generate questions in English language.'
-      }[language];
+      };
+      const languageInstruction = languageMap[language] || languageMap['English'];
 
-      const categoryInstruction = {
+      const categoryMap = {
         'History': 'History questions',
         'Geography': 'Geography questions',
         'Football': 'Football/Soccer questions',
@@ -32,13 +33,15 @@ class QuizGenerator {
         'Electronics': 'Electronics and technology questions',
         'Famous People': 'Famous people and celebrities questions',
         'Movies and Music': 'Movies and Music questions'
-      }[category];
+      };
+      const categoryInstruction = categoryMap[category] || categoryMap['History'];
 
-      const difficultyInstruction = {
+      const difficultyMap = {
         'Easy': 'easy difficulty - simple and straightforward',
         'Medium': 'medium difficulty - moderate challenge',
         'Hard': 'hard difficulty - challenging and complex'
-      }[difficulty];
+      };
+      const difficultyInstruction = difficultyMap[difficulty] || difficultyMap['Medium'];
 
       const prompt = `Generate exactly ${count} multiple choice quiz questions about ${categoryInstruction} with ${difficultyInstruction}. ${languageInstruction}
 

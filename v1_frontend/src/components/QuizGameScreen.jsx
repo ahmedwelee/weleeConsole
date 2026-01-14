@@ -26,6 +26,7 @@ function QuizGameScreen({ roomCode, players, onEndGame }) {
     setScores(initializeScores);
 
     // Wait for settings to be locked before starting quiz
+    const QUIZ_START_DELAY = 500; // ms - allows settings event to propagate
     socket.on('quiz:settings-locked', ({ settings }) => {
       setQuizSettings(settings);
       setWaitingForSettings(false);
@@ -40,7 +41,7 @@ function QuizGameScreen({ roomCode, players, onEndGame }) {
             alert('Failed to start quiz: ' + response.error);
           }
         });
-      }, 500);
+      }, QUIZ_START_DELAY);
     });
 
     socket.on('quiz:answer-submitted', ({ playerId, answerIndex, isCorrect, scores: updatedScores }) => {

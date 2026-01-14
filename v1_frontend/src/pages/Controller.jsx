@@ -53,13 +53,14 @@ function Controller() {
       console.log('Game started:', game);
     });
 
+    // Delay before transitioning to quiz after settings are locked
+    const SETTINGS_LOCK_TRANSITION_DELAY = 1500; // ms - allows settings to be sent to backend
     socket.on('quiz:settings-locked', () => {
       setQuizSettingsLocked(true);
-      // Delay to allow settings to be sent to backend
       setTimeout(() => {
         setShowQuizSettings(false);
         setGameStarted(true);
-      }, 1500);
+      }, SETTINGS_LOCK_TRANSITION_DELAY);
     });
 
     socket.on('game:ended', ({ finalScores }) => {
