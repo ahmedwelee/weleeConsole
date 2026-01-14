@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import socketService from '../utils/socket.js';
 import ControllerUI from '../components/ControllerUI';
+import QuizController from '../components/QuizController';
 import './Controller.css';
 
 function Controller() {
@@ -14,6 +15,7 @@ function Controller() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
+  const [gameName, setGameName] = useState('');
 
   useEffect(() => {
     const socket = socketService.connect();
@@ -35,9 +37,10 @@ function Controller() {
 
 
     // Listen for game events
-    socket.on('game:started', ({ gameName }) => {
+    socket.on('game:started', ({ gameName: game }) => {
       setGameStarted(true);
-      console.log('Game started:', gameName);
+      setGameName(game);
+      console.log('Game started:', game);
     });
 
     socket.on('game:ended', ({ finalScores }) => {
@@ -95,7 +98,18 @@ function Controller() {
           <p>The host will start the game soon</p>
         </div>
       ) : (
-        <ControllerUI onInput={handleInput} playerName={playerName} />
+        <>
+          {gameName === 'quiz' ? (
+            <QuizController 
+              onInput={socketService} 
+              playerName={playerName}
+              playerId={playerId}
+              roomCode={roomCode}
+            />
+          ) : (
+            <ControllerUI onInput={handleInput} playerName={playerName} />
+          )}
+        </>
       )}
     </div>
   );

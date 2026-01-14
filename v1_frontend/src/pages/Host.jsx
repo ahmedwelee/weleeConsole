@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import socketService from '../utils/socket.js';
 import GameScreen from '../components/GameScreen.jsx';
+import QuizGameScreen from '../components/QuizGameScreen.jsx';
 import PlayerList from '../components/PlayerList.jsx';
 import './Host.css';
 
@@ -112,6 +113,7 @@ function Host() {
                     className="game-select"
                   >
                     <option value="racing">🏎️ Racing Game</option>
+                    <option value="quiz">🎯 Quiz Battle</option>
                     <option value="trivia">🧠 Trivia Quiz</option>
                     <option value="drawing">🎨 Drawing Game</option>
                   </select>
@@ -128,12 +130,22 @@ function Host() {
           </div>
         </div>
       ) : (
-        <GameScreen 
-          roomCode={roomCode}
-          players={players}
-          gameName={currentGame}
-          onEndGame={handleEndGame}
-        />
+        <>
+          {currentGame === 'quiz' ? (
+            <QuizGameScreen 
+              roomCode={roomCode}
+              players={players}
+              onEndGame={handleEndGame}
+            />
+          ) : (
+            <GameScreen 
+              roomCode={roomCode}
+              players={players}
+              gameName={currentGame}
+              onEndGame={handleEndGame}
+            />
+          )}
+        </>
       )}
     </div>
   );
