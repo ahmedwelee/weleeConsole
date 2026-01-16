@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import RoomManager from './roomManager.js';
 import QuizGenerator from './quizGenerator.js';
 import QuizGameManager from "./quizGameManager.js";
+import WhoIsTheSpyGameManager from "./whoIsTheSpyGameManager.js";
 
 
 dotenv.config();
@@ -32,6 +33,7 @@ app.use(express.json());
 const roomManager = new RoomManager();
 const quizGenerator = new QuizGenerator();
 const quizGameManager  = new QuizGameManager();
+const spyGameManager = new WhoIsTheSpyGameManager();
 
 /* =========================
    HEALTH CHECK
@@ -281,6 +283,190 @@ io.on('connection', (socket) => {
           timeLimit: result.timeLimit
         });
       }
+
+      callback({ success: true });
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
+
+  /* ========================================
+     WHO IS THE SPY GAME EVENTS
+  ======================================== */
+
+  /* ---------- SPY GAME START ---------- */
+  socket.on('spy:start-game', ({ roomCode, playerId, language }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (!roomManager.isHost(code, playerId)) return callback({ success: false, error: 'Only host can start game' });
+
+      const players = roomManager.getPlayers(code);
+      if (players.length < 3) return callback({ success: false, error: 'Need at least 3 players' });
+
+      // Create and start the spy game
+      const gameState = spyGameManager.createGame(code, players, language || 'en');
+
+      // Set room state to PLAYING
+      roomManager.setRoomState(code, 'PLAYING');
+      room.gameState.currentGame = 'spy';
+
+      // Send assignments to each player individually
+      players.forEach(player => {
+        const assignment = spyGameManager.getPlayerAssignment(code, player.id);
+        io.to(player.socketId).emit('spy:assignment', {
+          isSpy: assignment.isSpy,
+          role: assignment.role,
+          location: assignment.location
+        });
+      });
+
+      // Broadcast game started to the room
+      io.to(code).emit('spy:game-started', {
+        phase: gameState.phase,
+        timer: gameState.timer,
+        uiText: spyGameManager.getAllUIText(language || 'en')
+      });
+
+      callback({ success: true, gameState });
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
+
+  /* ---------- SPY GAME START VOTING ---------- */
+  socket.on('spy:start-voting', ({ roomCode, playerId }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (!roomManager.isHost(code, playerId)) return callback({ success: false, error: 'Only host can start voting' });
+
+      const gameState = spyGameManager.startVoting(code);
+      if (!gameState) return callback({ success: false, error: 'Game not found' });
+
+      // Broadcast voting phase to all players
+      const players = roomManager.getPlayers(code);
+      io.to(code).emit('spy:voting-started', {
+        phase: 'VOTING',
+        players: players.map(p => ({ id: p.id, name: p.name }))
+      });
+
+      callback({ success: true });
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
+
+  /* ---------- SPY SUBMIT VOTE ---------- */
+  socket.on('spy:submit-vote', ({ roomCode, playerId, votedForId }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const game = spyGameManager.getGame(code);
+
+      if (!game) return callback({ success: false, error: 'Game not found' });
+
+      const result = spyGameManager.submitVote(code, playerId, votedForId);
+      if (!result) return callback({ success: false, error: 'Vote failed' });
+
+      // Notify room of vote count update
+      const players = roomManager.getPlayers(code);
+      io.to(code).emit('spy:vote-update', {
+        totalVotes: result.totalVotes,
+        expectedVotes: players.length
+      });
+
+      callback({ success: true });
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
+
+  /* ---------- SPY PROCESS VOTES ---------- */
+  socket.on('spy:process-votes', ({ roomCode, playerId }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (!roomManager.isHost(code, playerId)) return callback({ success: false, error: 'Only host can process votes' });
+
+      const result = spyGameManager.processVotes(code);
+      if (!result) return callback({ success: false, error: 'Failed to process votes' });
+
+      // Broadcast results to all players
+      io.to(code).emit('spy:game-result', result);
+
+      // Set room state to FINISHED
+      roomManager.setRoomState(code, 'FINISHED');
+
+      callback({ success: true, result });
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
+
+  /* ---------- SPY NEXT ROUND ---------- */
+  socket.on('spy:next-round', ({ roomCode, playerId }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (!roomManager.isHost(code, playerId)) return callback({ success: false, error: 'Only host can start next round' });
+
+      const players = roomManager.getPlayers(code);
+      const game = spyGameManager.getGame(code);
+      const language = game?.language || 'en';
+
+      // Reset game with same players
+      const gameState = spyGameManager.resetGame(code, players);
+
+      // Set room state back to PLAYING
+      roomManager.setRoomState(code, 'PLAYING');
+
+      // Send new assignments to each player
+      players.forEach(player => {
+        const assignment = spyGameManager.getPlayerAssignment(code, player.id);
+        io.to(player.socketId).emit('spy:assignment', {
+          isSpy: assignment.isSpy,
+          role: assignment.role,
+          location: assignment.location
+        });
+      });
+
+      // Broadcast new game started
+      io.to(code).emit('spy:game-started', {
+        phase: gameState.phase,
+        timer: gameState.timer,
+        uiText: spyGameManager.getAllUIText(language)
+      });
+
+      callback({ success: true });
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
+
+  /* ---------- SPY CHANGE LANGUAGE ---------- */
+  socket.on('spy:change-language', ({ roomCode, playerId, language }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (!roomManager.isHost(code, playerId)) return callback({ success: false, error: 'Only host can change language' });
+
+      spyGameManager.setLanguage(code, language);
+
+      // Broadcast language change
+      io.to(code).emit('spy:language-changed', {
+        language,
+        uiText: spyGameManager.getAllUIText(language)
+      });
 
       callback({ success: true });
     } catch (err) {

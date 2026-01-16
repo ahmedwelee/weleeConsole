@@ -1,0 +1,82 @@
+{
+  "locations": [
+    {
+      "id": "hammam",
+      "name_en": "Traditional Bath (Hammam)",
+      "name_ar": "الحمام الشعبي",
+      "roles_en": ["Cashier", "Customer", "Scrubber", "Water Carrier", "Attendant", "Massage Therapist"],
+      "roles_ar": ["مول الكية", "زبون", "كسال", "الطياب", "الحاجب", "المدلك"]
+    },
+    {
+      "id": "restaurant",
+      "name_en": "Restaurant",
+      "name_ar": "المطعم",
+      "roles_en": ["Chef", "Waiter", "Customer", "Manager", "Dishwasher", "Host"],
+      "roles_ar": ["الشيف", "النادل", "الزبون", "المدير", "غسال الصحون", "مستقبل الزبائن"]
+    },
+    {
+      "id": "airport",
+      "name_en": "Airport",
+      "name_ar": "المطار",
+      "roles_en": ["Pilot", "Flight Attendant", "Security Officer", "Passenger", "Ground Crew", "Customs Officer"],
+      "roles_ar": ["الطيار", "مضيفة الطيران", "ضابط الأمن", "المسافر", "طاقم الأرضي", "موظف الجمارك"]
+    },
+    {
+      "id": "hospital",
+      "name_en": "Hospital",
+      "name_ar": "المستشفى",
+      "roles_en": ["Doctor", "Nurse", "Patient", "Surgeon", "Pharmacist", "Receptionist"],
+      "roles_ar": ["الطبيب", "الممرضة", "المريض", "الجراح", "الصيدلي", "موظف الاستقبال"]
+    },
+    {
+      "id": "school",
+      "name_en": "School",
+      "name_ar": "المدرسة",
+      "roles_en": ["Teacher", "Student", "Principal", "Janitor", "Librarian", "Counselor"],
+      "roles_ar": ["المعلم", "الطالب", "المدير", "عامل النظافة", "أمين المكتبة", "المرشد"]
+    },
+    {
+      "id": "bank",
+      "name_en": "Bank",
+      "name_ar": "البنك",
+      "roles_en": ["Teller", "Customer", "Manager", "Security Guard", "Accountant", "Loan Officer"],
+      "roles_ar": ["الصراف", "العميل", "المدير", "حارس الأمن", "المحاسب", "موظف القروض"]
+    },
+    {
+      "id": "wedding",
+      "name_en": "Wedding Party",
+      "name_ar": "حفل زفاف",
+      "roles_en": ["Bride", "Groom", "Guest", "Photographer", "DJ", "Caterer"],
+      "roles_ar": ["العروس", "العريس", "الضيف", "المصور", "منسق الموسيقى", "موظف الطعام"]
+    }
+  ],
+  "ui_text": {
+    "vote_now": { "en": "Vote Now!", "ar": "صوت الآن!" },
+    "spy_msg": { "en": "YOU ARE THE SPY", "ar": "أنت الجاسوس" },
+    "civilian_msg": { "en": "Location: ", "ar": "المكان: " },
+    "role_msg": { "en": "Role: ", "ar": "الدور: " },
+    "you_are_safe": { "en": "You are Safe!", "ar": "أنت في أمان!" },
+    "figure_out_location": { "en": "Figure out the location!", "ar": "اكتشف المكان!" },
+    "who_is_spy": { "en": "Who is the spy?", "ar": "من هو الجاسوس؟" },
+    "vote_for": { "en": "Vote for:", "ar": "صوت لـ:" },
+    "waiting_votes": { "en": "Waiting for votes...", "ar": "في انتظار التصويت..." },
+    "spy_wins": { "en": "Spy Wins!", "ar": "الجاسوس فاز!" },
+    "civilians_win": { "en": "Civilians Win!", "ar": "المواطنون فازوا!" },
+    "the_spy_was": { "en": "The spy was:", "ar": "الجاسوس كان:" },
+    "the_location_was": { "en": "The location was:", "ar": "المكان كان:" },
+    "play_again": { "en": "Play Again", "ar": "العب مرة أخرى" },
+    "back_to_lobby": { "en": "Back to Lobby", "ar": "العودة للردهة" },
+    "start_game": { "en": "Start Game", "ar": "ابدأ اللعبة" },
+    "timer": { "en": "Time:", "ar": "الوقت:" },
+    "voting": { "en": "Voting...", "ar": "التصويت..." },
+    "round_starting": { "en": "Round Starting...", "ar": "جولة تبدأ..." },
+    "votes": { "en": "Votes", "ar": "الأصوات" },
+    "you_won": { "en": "You Won!", "ar": "أنت فزت!" },
+    "you_lost": { "en": "You Lost!", "ar": "أنت خسرت!" },
+    "language": { "en": "Language", "ar": "اللغة" },
+    "select_language": { "en": "Select Language:", "ar": "اختر اللغة:" },
+    "waiting_for_players": { "en": "Waiting for players...", "ar": "في انتظار اللاعبين..." },
+    "players": { "en": "Players", "ar": "اللاعبون" },
+    "room_code": { "en": "Room Code", "ar": "كود الغرفة" }
+  }
+}

@@ -105,6 +105,17 @@
   display: flex;
   flex-direction: column;
   gap:  15px;
+  align-items: stretch;
+}
+
+.game-controls .btn-warning {
+  background: linear-gradient(135deg, #ffd93d 0%, #ffaa00 100%);
+  color: #1e1e2e;
+}
+
+.game-controls .btn-warning:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 217, 61, 0.4);
 }
 
 .game-select {

@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import socketService from '../utils/socket.js';
 import QuizGameScreen from '../components/QuizGameScreen.jsx';
 import QuizConfigPanel from '../components/QuizConfigPanel.jsx';
+import SpyGameScreen from '../components/SpyGameScreen.jsx';
 import PlayerList from '../components/PlayerList.jsx';
 import './Host.css';
 
@@ -14,6 +15,7 @@ function Host() {
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [configReady, setConfigReady] = useState(false);
+  const [currentGame, setCurrentGame] = useState(null); // 'quiz' or 'spy'
 
   useEffect(() => {
     const socket = socketService.connect();
@@ -65,6 +67,7 @@ function Host() {
       console.log('Room state changed:', data.state);
       setRoomState(data.state);
       if (data.hostPlayerId) setHostPlayerId(data.hostPlayerId);
+      if (data.gameType) setCurrentGame(data.gameType);
     });
 
     // Listen for config ready
@@ -95,8 +98,21 @@ function Host() {
     }, (response) => {
       if (!response?.success) {
         console.error('Failed to select game:', response?.error);
+      } else {
+        setCurrentGame('quiz');
       }
     });
+  };
+
+  const handleSelectSpy = () => {
+    if (players.length < 3) {
+      alert('Need at least 3 players for Who Is The Spy!');
+      return;
+    }
+
+    // For spy game, we go directly to PLAYING, no config needed
+    setCurrentGame('spy');
+    setRoomState('PLAYING');
   };
 
   const handleConfigConfirmed = () => {
@@ -123,6 +139,7 @@ function Host() {
   const handleEndGame = (finalScores) => {
     setRoomState('WAITING');
     setConfigReady(false);
+    setCurrentGame(null);
   };
 
   const joinUrl = `${window.location.origin}/join`;
@@ -186,11 +203,22 @@ function Host() {
                     onClick={handleSelectQuiz}
                     className="btn btn-primary btn-large"
                     disabled={!isHost}
-                    style={{ opacity: isHost ? 1 : 0.5 }}
+                    style={{ opacity: isHost ? 1 : 0.5, marginBottom: '1rem' }}
                   >
-                    {isHost ? 'Start Quiz Battle 🎯' : 'Waiting for Host...'}
+                    {isHost ? '🎯 Quiz Battle' : 'Waiting for Host...'}
                   </button>
+                  
+                  <button 
+                    onClick={handleSelectSpy}
+                    className="btn btn-warning btn-large"
+                    disabled={!isHost || players.length < 3}
+                    style={{ opacity: isHost && players.length >= 3 ? 1 : 0.5 }}
+                  >
+                    {isHost ? '🕵️ Who Is The Spy' : 'Waiting for Host...'}
+                  </button>
+                  
                   {!isHost && <p style={{ color: '#ff6b6b', marginTop: '10px' }}>Only the host can start the game</p>}
+                  {isHost && players.length < 3 && <p style={{ color: '#ffd93d', marginTop: '10px' }}>Need at least 3 players for Who Is The Spy</p>}
                 </div>
               )}
             </div>
@@ -240,6 +268,20 @@ function Host() {
 
   // PLAYING STATE - Show game screen
   if (roomState === 'PLAYING') {
+    if (currentGame === 'spy') {
+      return (
+        <SpyGameScreen 
+          roomCode={roomCode}
+          playerId={hostPlayerId}
+          players={players}
+          onBackToLobby={() => {
+            setRoomState('WAITING');
+            setCurrentGame(null);
+          }}
+        />
+      );
+    }
+    
     return (
       <QuizGameScreen 
         roomCode={roomCode}

@@ -67,4 +67,42 @@
   justify-content: center;
   text-align: center;
   padding: 40px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.controller-waiting {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.controller-waiting .waiting-icon {
+  font-size: 5rem;
+  margin-bottom: 1rem;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.controller-waiting h2 {
+  font-size: 2rem;
+  margin: 1rem 0;
+}
+
+.controller-waiting p {
+  font-size: 1.2rem;
+  opacity: 0.8;
+  margin: 0.5rem 0;
 }
