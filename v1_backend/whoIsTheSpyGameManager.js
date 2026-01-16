@@ -90,13 +90,16 @@ class WhoIsTheSpyGameManager {
     const locationNameKey = language === 'ar' ? 'name_ar' : 'name_en';
     const roles = [...location[roleKey]]; // Copy array
 
-    // Shuffle roles
+    // Shuffle roles using Fisher-Yates algorithm
     for (let i = roles.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [roles[i], roles[j]] = [roles[j], roles[i]];
     }
 
-    players.forEach((player, index) => {
+    // Track which roles have been assigned to avoid repeats when possible
+    let roleAssignmentIndex = 0;
+    
+    players.forEach((player) => {
       if (player.id === spyId) {
         // Spy doesn't get location or role
         assignments.set(player.id, {
@@ -106,10 +109,13 @@ class WhoIsTheSpyGameManager {
         });
       } else {
         // Civilians get location and a specific role
-        const roleIndex = index % roles.length;
+        // Use sequential from shuffled roles, wrapping around if more players than roles
+        const role = roles[roleAssignmentIndex % roles.length];
+        roleAssignmentIndex++;
+        
         assignments.set(player.id, {
           isSpy: false,
-          role: roles[roleIndex],
+          role: role,
           location: location[locationNameKey]
         });
       }
