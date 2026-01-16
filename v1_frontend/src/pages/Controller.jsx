@@ -1,103 +1,57 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import socketService from '../utils/socket.js';
-import ControllerUI from '../components/ControllerUI';
 import QuizController from '../components/QuizController';
-import QuizSettingsPanel from '../components/QuizSettingsPanel';
 import './Controller.css';
 
 function Controller() {
   const { roomCode } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
+
   const [playerName] = useState(searchParams.get('name') || 'Player');
   const [playerId, setPlayerId] = useState('');
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
-  const [gameStarted, setGameStarted] = useState(false);
-  const [gameName, setGameName] = useState('');
-  const [isFirstPlayer, setIsFirstPlayer] = useState(false);
-  const [showQuizSettings, setShowQuizSettings] = useState(false);
-  const [quizSettingsLocked, setQuizSettingsLocked] = useState(false);
 
   useEffect(() => {
     const socket = socketService.connect();
 
-    socket.on("connect", () => {
-      console.log("🟢 Socket connected, joining room...");
+    console.log(`🔄 Attempting to join room: ${roomCode} as ${playerName}`);
+    console.log('🔍 DEBUG - URL params:', { roomCode, playerName });
+    console.log('🔍 DEBUG - searchParams.get("name"):', searchParams.get('name'));
 
-      socketService.joinRoom(roomCode, playerName, (response) => {
-        console.log("JOIN RESPONSE:", response);
-
-        if (response.success) {
-          setPlayerId(response.playerId);
-          setIsFirstPlayer(response.isFirstPlayer || false);
-          setConnected(true);
-        } else {
-          setError(response.error);
-        }
-      });
-    });
-
-
-    // Listen for game events
-    socket.on('game:started', ({ gameName: game }) => {
-      setGameName(game);
-      if (game === 'quiz') {
-        setShowQuizSettings(true);
-        setQuizSettingsLocked(false);
+    // Join Room Logic
+    socketService.joinRoom(roomCode, playerName, (response) => {
+      if (response.success) {
+        console.log('✅ Successfully joined room:', response);
+        console.log('🔍 DEBUG - Player ID assigned:', response.playerId);
+        console.log('🔍 DEBUG - Is Host?:', response.isHost);
+        setPlayerId(response.playerId);
+        setConnected(true);
+        // Store for QuizController component
+        localStorage.setItem('playerName', playerName);
       } else {
-        setGameStarted(true);
+        console.error('❌ Failed to join room:', response.error);
+        setError(response.error || 'Failed to join room');
       }
-      console.log('Game started:', game);
     });
 
-    // Delay before transitioning to quiz after settings are locked
-    const SETTINGS_LOCK_TRANSITION_DELAY = 1500; // ms - allows settings to be sent to backend
-    socket.on('quiz:settings-locked', () => {
-      setQuizSettingsLocked(true);
-      setTimeout(() => {
-        setShowQuizSettings(false);
-        setGameStarted(true);
-      }, SETTINGS_LOCK_TRANSITION_DELAY);
-    });
-
-    socket.on('game:ended', ({ finalScores }) => {
-      setGameStarted(false);
-      setShowQuizSettings(false);
-      setQuizSettingsLocked(false);
-      console.log('Game ended:', finalScores);
-    });
-
-    socket.on('room:closed', ({ reason }) => {
-      alert(`Room closed: ${reason}`);
+    socket.on('room:closed', () => {
+      alert('Room was closed by host');
       navigate('/join');
     });
 
     return () => {
-      socket.off('game:started');
-      socket.off('quiz:settings-locked');
-      socket.off('game:ended');
       socket.off('room:closed');
-      socketService.disconnect();
+      // Don't disconnect, QuizController needs the connection
     };
   }, [roomCode, playerName, navigate]);
-
-  const handleInput = (input) => {
-    if (connected && playerId) {
-      socketService.sendInput(roomCode, playerId, input);
-    }
-  };
-
-  const handleQuizSettingsLocked = () => {
-    setQuizSettingsLocked(true);
-  };
 
   if (error) {
     return (
       <div className="controller-error">
-        <h2>❌ Error</h2>
+        <h2>❌ Connection Error</h2>
         <p>{error}</p>
         <button onClick={() => navigate('/join')} className="btn btn-primary">
           Try Again
@@ -107,49 +61,21 @@ function Controller() {
   }
 
   if (!connected) {
-    return <div className="loading">Connecting... </div>;
+    return (
+      <div className="loading">
+        <div className="spinner"></div>
+        <h2>Connecting to Room {roomCode}...</h2>
+        <p>Player: {playerName}</p>
+      </div>
+    );
   }
 
+  // Connected - Show the QuizController (handles all states internally)
   return (
-    <div className="controller-container">
-      <header className="controller-header">
-        <div className="player-info">
-          <span className="player-name">{playerName}</span>
-          <span className="room-badge">Room: {roomCode}</span>
-        </div>
-        <div className={`status ${connected ? 'connected' : 'disconnected'}`}>
-          {connected ? '🟢 Connected' : '🔴 Disconnected'}
-        </div>
-      </header>
-
-      {!gameStarted && !showQuizSettings ? (
-        <div className="waiting-screen">
-          <h2>⏳ Waiting for game to start...</h2>
-          <p>The host will start the game soon</p>
-        </div>
-      ) : showQuizSettings ? (
-        <QuizSettingsPanel
-          roomCode={roomCode}
-          playerId={playerId}
-          isFirstPlayer={isFirstPlayer}
-          onSettingsLocked={handleQuizSettingsLocked}
-          socketService={socketService}
-        />
-      ) : (
-        <>
-          {gameName === 'quiz' ? (
-            <QuizController 
-              onInput={socketService} 
-              playerName={playerName}
-              playerId={playerId}
-              roomCode={roomCode}
-            />
-          ) : (
-            <ControllerUI onInput={handleInput} playerName={playerName} />
-          )}
-        </>
-      )}
-    </div>
+    <QuizController 
+      playerId={playerId}
+      roomCode={roomCode}
+    />
   );
 }
 

@@ -1,111 +1,100 @@
-import OpenAI from 'openai';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import 'dotenv/config';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 class QuizGenerator {
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is undefined. Check your .env file.");
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+    // Update the model string here
+    this.model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash", // Use 2.5-flash or gemini-3-flash-preview
+      generationConfig: { responseMimeType: "application/json" }
     });
   }
 
-  async generateQuestions(count = 20, settings = {}) {
+  async generateQuestions(count = 10, settings = {}) {
     const {
-      language = 'English',
-      category = 'History',
-      difficulty = 'Medium'
+      language = "English",
+      category = "History",
+      difficulty = "Medium"
     } = settings;
 
-    try {
-      const languageMap = {
-        'Arabic': 'Generate questions in Arabic language.',
-        'French': 'Generate questions in French language.',
-        'English': 'Generate questions in English language.'
-      };
-      const languageInstruction = languageMap[language] || languageMap['English'];
+    // ❌ response_mime_type REMOVED (not supported in v1)
+    const generationConfig = {
+      temperature: 0.7,
+      topP: 0.9,
+      maxOutputTokens: 4096,
+    };
 
-      const categoryMap = {
-        'History': 'History questions',
-        'Geography': 'Geography questions',
-        'Football': 'Football/Soccer questions',
-        'Countries and Capitals': 'Countries and their Capitals questions',
-        'Electronics': 'Electronics and technology questions',
-        'Famous People': 'Famous people and celebrities questions',
-        'Movies and Music': 'Movies and Music questions'
-      };
-      const categoryInstruction = categoryMap[category] || categoryMap['History'];
+    const prompt = `
+Generate exactly ${count} multiple choice quiz questions.
 
-      const difficultyMap = {
-        'Easy': 'easy difficulty - simple and straightforward',
-        'Medium': 'medium difficulty - moderate challenge',
-        'Hard': 'hard difficulty - challenging and complex'
-      };
-      const difficultyInstruction = difficultyMap[difficulty] || difficultyMap['Medium'];
+Topic: ${category}
+Difficulty: ${difficulty}
+Language: ${language}
 
-      const prompt = `Generate exactly ${count} multiple choice quiz questions about ${categoryInstruction} with ${difficultyInstruction}. ${languageInstruction}
+STRICT RULES:
+- Return ONLY valid JSON
+- No explanations
+- No markdown
+- No extra text
 
-Each question should have:
-- A clear question
-- Exactly 4 options (A, B, C, D)
-- One correct answer
-
-Format as JSON array:
+JSON format:
 [
   {
-    "question": "Question text",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "question": "string",
+    "options": ["string", "string", "string", "string"],
     "correctAnswer": 0
   }
 ]
+`;
 
-The correctAnswer is the index (0-3) of the correct option.
-Return only valid JSON, no additional text.`;
-
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
+    try {
+      const result = await this.model.generateContent({
+        contents: [
           {
-            role: 'system',
-            content: 'You are a quiz generator. Generate engaging, accurate quiz questions. Always respond with valid JSON only.'
-          },
-          {
-            role: 'user',
-            content: prompt
+            role: "user",
+            parts: [{ text: prompt }]
           }
         ],
-        temperature: 0.8,
-        max_tokens: 3000
+        generationConfig,
       });
 
-      const content = response.choices[0].message.content.trim();
-      
-      let questions;
-      try {
-        questions = JSON.parse(content);
-      } catch (parseError) {
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          questions = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('Failed to parse questions from response');
-        }
+      const text = result.response.text().trim();
+
+      const questions = JSON.parse(text);
+
+      if (!Array.isArray(questions)) {
+        throw new Error("Gemini response is not an array");
       }
 
-      if (!Array.isArray(questions) || questions.length !== count) {
-        console.warn(`Expected ${count} questions, got ${questions.length}`);
-      }
+      return questions.slice(0, count).map(q => ({
+        question: typeof q.question === "string"
+            ? q.question
+            : "Missing Question",
 
-      return questions.slice(0, count);
+        options: Array.isArray(q.options) && q.options.length === 4
+            ? q.options.map(String)
+            : ["Option A", "Option B", "Option C", "Option D"],
+
+        correctAnswer:
+            Number.isInteger(q.correctAnswer) && q.correctAnswer >= 0 && q.correctAnswer <= 3
+                ? q.correctAnswer
+                : 0
+      }));
 
     } catch (error) {
-      console.error('Error generating questions:', error);
+      console.error("❌ Gemini API Error:", error.message);
       return this.getFallbackQuestions(count);
     }
   }
 
-  getFallbackQuestions(count = 20) {
-    const fallbackQuestions = [
+  getFallbackQuestions(count = 10) {
+    const fallback = [
       {
         question: "What is the capital of France?",
         options: ["London", "Berlin", "Paris", "Madrid"],
@@ -117,98 +106,25 @@ Return only valid JSON, no additional text.`;
         correctAnswer: 1
       },
       {
-        question: "What is 2 + 2?",
-        options: ["3", "4", "5", "6"],
-        correctAnswer: 1
-      },
-      {
         question: "Who painted the Mona Lisa?",
-        options: ["Vincent van Gogh", "Pablo Picasso", "Leonardo da Vinci", "Michelangelo"],
+        options: ["Van Gogh", "Picasso", "Da Vinci", "Monet"],
         correctAnswer: 2
       },
       {
-        question: "What is the largest ocean on Earth?",
-        options: ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean", "Pacific Ocean"],
-        correctAnswer: 3
-      },
-      {
-        question: "How many continents are there?",
-        options: ["5", "6", "7", "8"],
-        correctAnswer: 2
-      },
-      {
-        question: "What is the chemical symbol for gold?",
-        options: ["Go", "Gd", "Au", "Ag"],
-        correctAnswer: 2
-      },
-      {
-        question: "Who wrote 'Romeo and Juliet'?",
-        options: ["Charles Dickens", "William Shakespeare", "Jane Austen", "Mark Twain"],
-        correctAnswer: 1
-      },
-      {
-        question: "What is the speed of light?",
-        options: ["300,000 km/s", "150,000 km/s", "450,000 km/s", "600,000 km/s"],
-        correctAnswer: 0
-      },
-      {
-        question: "Which country is home to the kangaroo?",
-        options: ["New Zealand", "South Africa", "Australia", "Brazil"],
-        correctAnswer: 2
-      },
-      {
-        question: "What is the smallest prime number?",
-        options: ["0", "1", "2", "3"],
-        correctAnswer: 2
-      },
-      {
-        question: "Who invented the telephone?",
-        options: ["Thomas Edison", "Nikola Tesla", "Alexander Graham Bell", "Benjamin Franklin"],
-        correctAnswer: 2
-      },
-      {
-        question: "What is the currency of Japan?",
-        options: ["Yuan", "Won", "Yen", "Ringgit"],
-        correctAnswer: 2
-      },
-      {
-        question: "How many sides does a hexagon have?",
-        options: ["5", "6", "7", "8"],
-        correctAnswer: 1
-      },
-      {
-        question: "What is the largest mammal in the world?",
-        options: ["African Elephant", "Blue Whale", "Giraffe", "Polar Bear"],
+        question: "Which element has the chemical symbol 'O'?",
+        options: ["Gold", "Oxygen", "Osmium", "Oganesson"],
         correctAnswer: 1
       },
       {
         question: "In which year did World War II end?",
         options: ["1943", "1944", "1945", "1946"],
         correctAnswer: 2
-      },
-      {
-        question: "What is the hardest natural substance on Earth?",
-        options: ["Gold", "Iron", "Diamond", "Platinum"],
-        correctAnswer: 2
-      },
-      {
-        question: "Who was the first person to walk on the moon?",
-        options: ["Buzz Aldrin", "Neil Armstrong", "Yuri Gagarin", "John Glenn"],
-        correctAnswer: 1
-      },
-      {
-        question: "What is the capital of Italy?",
-        options: ["Venice", "Milan", "Rome", "Florence"],
-        correctAnswer: 2
-      },
-      {
-        question: "How many keys are on a standard piano?",
-        options: ["76", "88", "92", "100"],
-        correctAnswer: 1
       }
     ];
 
-    return fallbackQuestions.slice(0, count);
+    return Array.from({ length: count }, (_, i) =>
+        fallback[i % fallback.length]
+    );
   }
 }
 

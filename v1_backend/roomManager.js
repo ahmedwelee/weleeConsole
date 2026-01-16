@@ -20,7 +20,9 @@ class RoomManager {
     const room = {
       code: roomCode,
       host: hostSocketId,
+      hostPlayerId: null, // Will be set when host joins as player
       players: new Map(),
+      state: 'WAITING', // WAITING → CONFIG → PLAYING → FINISHED
       gameState: {
         started: false,
         currentGame: null,
@@ -30,7 +32,7 @@ class RoomManager {
         language: 'English',
         category: 'History',
         difficulty: 'Medium',
-        locked: false
+        configReady: false
       },
       createdAt: Date.now()
     };
@@ -53,13 +55,19 @@ class RoomManager {
     const player = {
       id: playerId,
       name: playerName,
-      socketId:  socketId,
+      socketId: socketId,
       connected: true,
       joinedAt: Date.now()
     };
 
     room.players.set(playerId, player);
     room.gameState.scores[playerId] = 0;
+    
+    // Set first player as HOST
+    if (room.players.size === 1) {
+      room.hostPlayerId = playerId;
+      console.log(`Player ${playerName} is the HOST of room ${roomCode}`);
+    }
     
     console.log(`Player ${playerName} joined room ${roomCode}`);
     return player;
@@ -146,13 +154,33 @@ class RoomManager {
     return room.quizSettings;
   }
 
-  // Lock quiz settings
-  lockQuizSettings(roomCode) {
+  // Confirm quiz settings and move to CONFIG state
+  confirmQuizSettings(roomCode) {
     const room = this.getRoom(roomCode);
     if (!room) return false;
 
-    room.quizSettings.locked = true;
+    room.quizSettings.configReady = true;
     return true;
+  }
+
+  // Change room state
+  setRoomState(roomCode, newState) {
+    const room = this.getRoom(roomCode);
+    if (!room) return false;
+
+    const validStates = ['WAITING', 'CONFIG', 'PLAYING', 'FINISHED'];
+    if (!validStates.includes(newState)) return false;
+
+    room.state = newState;
+    console.log(`Room ${roomCode} state changed to: ${newState}`);
+    return true;
+  }
+
+  // Check if player is host
+  isHost(roomCode, playerId) {
+    const room = this.getRoom(roomCode);
+    if (!room) return false;
+    return room.hostPlayerId === playerId;
   }
 
   // Get quiz settings

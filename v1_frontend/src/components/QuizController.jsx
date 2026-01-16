@@ -1,178 +1,138 @@
 import React, { useEffect, useState } from 'react';
+import socketService from '../utils/socket.js';
 import './QuizController.css';
 
-function QuizController({ onInput, playerId, roomCode }) {
-  const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
+function QuizController({ playerId, roomCode }) {
+  const [roomState, setRoomState] = useState('WAITING');
   const [hasAnswered, setHasAnswered] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(null);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
   const [score, setScore] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(20);
-  const [waitingForNext, setWaitingForNext] = useState(false);
 
   useEffect(() => {
-    const socket = onInput;
+    const socket = socketService.getSocket();
+    if (!socket || !roomCode) return;
 
-    if (socket && socket.getSocket) {
-      const socketInstance = socket.getSocket();
-
-      socketInstance.on('quiz:new-question', ({ question }) => {
-        setCurrentQuestion(question);
-        setSelectedAnswer(null);
+    // Listen for room state changes
+    socket.on('room:state-changed', (data) => {
+      console.log('Room state changed:', data.state);
+      setRoomState(data.state);
+      
+      if (data.state === 'PLAYING') {
         setHasAnswered(false);
-        setIsCorrect(null);
-        setTimeRemaining(20);
-        setWaitingForNext(false);
-      });
+        setFeedbackMessage('');
+      }
+    });
 
-      socketInstance.on('quiz:finished', ({ finalScores }) => {
-        setScore(finalScores[playerId] || 0);
-        setCurrentQuestion(null);
-        setWaitingForNext(true);
-      });
+    // Listen for new questions
+    socket.on('quiz:new-question', () => {
+      setHasAnswered(false);
+      setFeedbackMessage('');
+    });
 
-      loadInitialQuestion();
-    }
+    // Listen for quiz finished
+    socket.on('quiz:finished', (data) => {
+      const finalScore = data?.finalScores?.[playerId] || 0;
+      setScore(finalScore);
+      setRoomState('FINISHED');
+    });
 
     return () => {
-      if (socket && socket.getSocket) {
-        const socketInstance = socket.getSocket();
-        socketInstance.off('quiz:new-question');
-        socketInstance.off('quiz:finished');
-      }
+      socket.off('room:state-changed');
+      socket.off('quiz:new-question');
+      socket.off('quiz:finished');
     };
-  }, [playerId, roomCode]);
+  }, [roomCode, playerId]);
 
-  useEffect(() => {
-    if (currentQuestion && !hasAnswered && timeRemaining > 0) {
-      const timer = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+  const handleAnswerClick = (letter) => {
+    if (hasAnswered || roomState !== 'PLAYING') return;
 
-      return () => clearInterval(timer);
-    }
-  }, [currentQuestion, hasAnswered, timeRemaining]);
-
-  const loadInitialQuestion = () => {
-    if (onInput && onInput.getSocket) {
-      const socket = onInput.getSocket();
-      socket.emit('quiz:get-question', { roomCode }, (response) => {
-        if (response.success && response.question) {
-          setCurrentQuestion(response.question);
-          setTimeRemaining(20);
-        }
-      });
-    }
-  };
-
-  const handleAnswerSelect = (answerIndex) => {
-    if (hasAnswered || timeRemaining === 0) return;
-
-    setSelectedAnswer(answerIndex);
     setHasAnswered(true);
+    setFeedbackMessage('Answer submitted!');
 
-    if (onInput && onInput.getSocket) {
-      const socket = onInput.getSocket();
-      socket.emit('quiz:submit-answer', { roomCode, playerId, answerIndex }, (response) => {
-        if (response.success) {
-          setIsCorrect(response.isCorrect);
+    socketService.getSocket().emit('quiz:submit-answer', {
+      roomCode,
+      playerId,
+      answerLetter: letter
+    }, (response) => {
+      if (response?.success) {
+        if (response.isCorrect) {
+          setFeedbackMessage('✅ Correct!');
           setScore(response.score);
-          setWaitingForNext(true);
+        } else {
+          setFeedbackMessage('❌ Wrong!');
         }
-      });
-    }
+      }
+    });
   };
 
-  if (!currentQuestion && !waitingForNext) {
+  // Render based on room state
+  if (roomState === 'WAITING' || roomState === 'CONFIG') {
     return (
-      <div className="quiz-controller">
-        <div className="waiting-state">
-          <h2>🎯 Quiz Battle</h2>
-          <p>Waiting for quiz to start...</p>
+      <div className="quiz-controller waiting-state">
+        <div className="status-card">
+          <div className="loader"></div>
+          <h2>🎯 Room: {roomCode}</h2>
+          <p>{roomState === 'WAITING' ? 'Waiting for host to select game...' : 'Host is configuring the game...'}</p>
         </div>
       </div>
     );
   }
 
-  if (waitingForNext && !currentQuestion) {
+  if (roomState === 'FINISHED') {
     return (
-      <div className="quiz-controller">
-        <div className="result-state">
-          <h2>🏆 Quiz Complete!</h2>
-          <div className="score-display">
-            <p>Your Score</p>
-            <div className="score-big">{score}</div>
-          </div>
-          <p className="result-message">Great job! Waiting for final results...</p>
+      <div className="quiz-controller result-state">
+        <h1>🏆 Game Over!</h1>
+        <div className="score-circle">
+          <span className="final-score">{score}</span>
+          <p>Points</p>
         </div>
+        <p>Check the main screen for rankings!</p>
       </div>
     );
   }
 
-  if (waitingForNext) {
-    return (
-      <div className="quiz-controller">
-        <div className="result-state">
-          {isCorrect !== null && (
-            <>
-              <div className={`result-icon ${isCorrect ? 'correct' : 'incorrect'}`}>
-                {isCorrect ? '✓' : '✗'}
-              </div>
-              <h2>{isCorrect ? 'Correct!' : 'Incorrect'}</h2>
-              <div className="score-display">
-                <p>Your Score</p>
-                <div className="score-big">{score}</div>
-              </div>
-            </>
-          )}
-          <p className="waiting-text">Waiting for next question...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // PLAYING STATE - Show only A/B/C/D buttons
   return (
-    <div className="quiz-controller">
+    <div className="quiz-controller playing-state">
       <div className="controller-header">
-        <div className="question-info">
-          <span className="question-number">
-            Q{currentQuestion.questionIndex + 1}/{currentQuestion.totalQuestions}
-          </span>
-          <div className={`timer-display ${timeRemaining <= 5 ? 'urgent' : ''}`}>
-            ⏱️ {timeRemaining}s
-          </div>
-        </div>
-        <div className="score-info">
-          Score: <strong>{score}</strong>
-        </div>
+        <h2>Room: {roomCode}</h2>
+        <div className="score-badge">Score: {score}</div>
       </div>
 
-      <div className="question-display">
-        <h3>{currentQuestion.question}</h3>
+      <div className="letter-buttons-grid">
+        <button
+          className={`letter-btn ${hasAnswered ? 'disabled' : ''}`}
+          onClick={() => handleAnswerClick('A')}
+          disabled={hasAnswered}
+        >
+          A
+        </button>
+        <button
+          className={`letter-btn ${hasAnswered ? 'disabled' : ''}`}
+          onClick={() => handleAnswerClick('B')}
+          disabled={hasAnswered}
+        >
+          B
+        </button>
+        <button
+          className={`letter-btn ${hasAnswered ? 'disabled' : ''}`}
+          onClick={() => handleAnswerClick('C')}
+          disabled={hasAnswered}
+        >
+          C
+        </button>
+        <button
+          className={`letter-btn ${hasAnswered ? 'disabled' : ''}`}
+          onClick={() => handleAnswerClick('D')}
+          disabled={hasAnswered}
+        >
+          D
+        </button>
       </div>
 
-      <div className="answers-grid">
-        {currentQuestion.options.map((option, index) => (
-          <button
-            key={index}
-            className={`answer-btn ${selectedAnswer === index ? 'selected' : ''} ${hasAnswered ? 'disabled' : ''}`}
-            onClick={() => handleAnswerSelect(index)}
-            disabled={hasAnswered || timeRemaining === 0}
-          >
-            <span className="answer-label">{String.fromCharCode(65 + index)}</span>
-            <span className="answer-text">{option}</span>
-          </button>
-        ))}
-      </div>
-
-      {timeRemaining === 0 && !hasAnswered && (
-        <div className="timeout-message">
-          ⏰ Time's up!
+      {feedbackMessage && (
+        <div className="feedback-message">
+          {feedbackMessage}
         </div>
       )}
     </div>

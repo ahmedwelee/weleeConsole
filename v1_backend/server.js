@@ -5,371 +5,306 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import RoomManager from './roomManager.js';
 import QuizGenerator from './quizGenerator.js';
-import QuizGameManager from './quizGameManager.js';
+import QuizGameManager from "./quizGameManager.js";
+
 
 dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+
+/* =========================
+   SOCKET.IO (FIXED CORS)
+========================= */
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://192.168.1.108:5173',
-    methods: ['GET', 'POST']
+    origin: "*", // Adjust to your frontend URL in production
+    methods: ["GET", "POST"]
   }
 });
 
-const roomManager = new RoomManager();
-const quizGenerator = new QuizGenerator();
-const quizGameManager = new QuizGameManager();
-
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://192.168.1.108:5173"
-  ],
-  credentials: true
-}));
-
+/* =========================
+   EXPRESS MIDDLEWARE
+========================= */
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-// Health check endpoint
+const roomManager = new RoomManager();
+const quizGenerator = new QuizGenerator();
+const quizGameManager  = new QuizGameManager();
+
+/* =========================
+   HEALTH CHECK
+========================= */
 app.get('/health', (req, res) => {
-  const stats = roomManager.getRoomStats();
   res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    ...stats
+    status: "ok",
+    time: new Date().toISOString(),
+    rooms: roomManager.getRoomStats()
   });
 });
 
-// Socket.IO connection handling
+/* =========================
+   SOCKET CONNECTION
+========================= */
 io.on('connection', (socket) => {
-  console.log(`Client connected: ${socket.id}`);
+  console.log("✅ Connected:", socket.id);
 
-  // HOST: Create a new room
+  /* ---------- HOST CREATE ROOM ---------- */
   socket.on('host:create-room', (callback) => {
     try {
       const room = roomManager.createRoom(socket.id);
       socket.join(room.code);
+      callback({ success: true, roomCode: room.code });
+      console.log(`🏠 Room created: ${room.code}`);
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
 
+  /* ---------- PLAYER JOIN ROOM ---------- */
+  socket.on('player:join-room', ({ roomCode, playerName }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: "Room not found" });
+
+      const player = roomManager.addPlayer(code, socket.id, playerName, socket.id);
+      socket.join(code);
+
+      // Notify all players in the room about the new player
+      io.to(code).emit("player:joined", {
+        player,
+        players: roomManager.getPlayers(code),
+        hostPlayerId: room.hostPlayerId,
+        roomState: room.state
+      });
+
+      const firstPlayerId = roomManager.getFirstPlayerId(code);
       callback({
         success: true,
-        roomCode: room.code
+        roomCode: code,
+        playerId: player.id,
+        isHost: player.id === room.hostPlayerId,
+        isFirstPlayer: player.id === firstPlayerId,
+        roomState: room.state
       });
-
-      console.log(`Host ${socket.id} created room ${room.code}`);
-    } catch (error) {
-      callback({ success: false, error: error. message });
+    } catch (err) {
+      callback({ success: false, error: err.message });
     }
   });
 
-  // PLAYER: Join a room
-    socket.on('player:join-room', ({ roomCode, playerName }, callback) => {
-        try {
-            const code = roomCode.toUpperCase();
-            const room = roomManager.getRoom(code);
-
-            if (!room) {
-                return callback({ success: false, error: 'Room not found' });
-            }
-
-            const player = roomManager.addPlayer(
-                code,
-                socket.id,
-                playerName,
-                socket.id
-            );
-
-            socket.join(code);
-
-            // Notify host
-            io.to(room.host).emit('player:joined', {
-                player,
-                players: roomManager.getPlayers(code)
-            });
-
-            // Determine if this is the first player
-            const firstPlayerId = roomManager.getFirstPlayerId(code);
-            const isFirstPlayer = player.id === firstPlayerId;
-
-            callback({
-                success: true,
-                playerId: player.id,
-                roomCode: code,
-                isFirstPlayer
-            });
-        } catch (err) {
-            callback({ success: false, error: err.message });
-        }
-    });
-
-
-    // PLAYER: Send controller input
-  socket.on('controller:input', ({ roomCode, playerId, input }) => {
-    const room = roomManager.getRoom(roomCode);
-    if (!room) return;
-
-    // Forward input to host
-    io.to(room. host).emit('game:input', {
-      playerId,
-      input,
-      timestamp: Date.now()
-    });
-  });
-
-  // HOST: Start game
-  socket.on('host:start-game', ({ roomCode, gameName }) => {
-    const gameState = roomManager.updateGameState(roomCode, {
-      started: true,
-      currentGame:  gameName
-    });
-
-    if (gameState) {
-      io.to(roomCode).emit('game:started', {
-        gameName,
-        gameState
-      });
-    }
-  });
-
-  // HOST: Update game state
-  socket.on('host:game-state', ({ roomCode, state }) => {
-    const room = roomManager.getRoom(roomCode);
-    if (!room) return;
-
-    // Broadcast game state to all players in room
-    socket.to(roomCode).emit('game:state-update', state);
-  });
-
-  // HOST: End game
-  socket.on('host:end-game', ({ roomCode, finalScores }) => {
-    const gameState = roomManager.updateGameState(roomCode, {
-      started: false,
-      currentGame:  null,
-      scores: finalScores
-    });
-
-    if (gameState) {
-      io.to(roomCode).emit('game:ended', {
-        finalScores:  gameState.scores
-      });
-    }
-  });
-
-  // QUIZ: Start quiz battle
-  socket.on('quiz:start', async ({ roomCode }, callback) => {
+  /* ---------- HOST START GAME BRIDGE ---------- */
+  socket.on('host:start-game', async ({ roomCode, gameName }, callback) => {
     try {
-      const room = roomManager.getRoom(roomCode);
-      if (!room) {
-        return callback({ success: false, error: 'Room not found' });
-      }
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+      if (!room) return callback ? callback({ success: false, error: 'Room not found' }) : null;
 
-      const players = roomManager.getPlayers(roomCode);
-      if (players.length === 0) {
-        return callback({ success: false, error: 'No players in room' });
-      }
+      if (gameName === 'quiz') {
+        const settings = roomManager.getQuizSettings(code) || {};
+        const questions = await quizGenerator.generateQuestions(10, settings);
 
-      // Get quiz settings
-      const settings = roomManager.getQuizSettings(roomCode);
-      if (!settings.locked) {
-        return callback({ success: false, error: 'Quiz settings not locked' });
-      }
+        quizGameManager.createGame(code, questions);
+        quizGameManager.startGame(code);
 
-      console.log(`Generating quiz questions for room ${roomCode} with settings:`, settings);
-      const questions = await quizGenerator.generateQuestions(20, settings);
-      
-      const game = quizGameManager.createGame(roomCode, questions);
-      
-      const scores = {};
-      players.forEach(player => {
-        scores[player.id] = 0;
+        // Broadcast the quiz start to the entire room (includes host + controllers)
+        io.to(code).emit('quiz:started', {
+          questions,
+          currentQuestion: quizGameManager.getCurrentQuestion(code)
+        });
+
+        if (callback) callback({ success: true, questions });
+      } else {
+        io.to(code).emit('host:game-started', { gameName });
+        if (callback) callback({ success: true });
+      }
+    } catch (err) {
+      if (callback) callback({ success: false, error: err.message });
+    }
+  });
+
+  /* ---------- ENTER CONFIG STATE ---------- */
+  socket.on('game:select', ({ roomCode, playerId, gameType }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (room.state !== 'WAITING') return callback({ success: false, error: 'Invalid state' });
+      if (!roomManager.isHost(code, playerId)) return callback({ success: false, error: 'Only host can select game' });
+
+      roomManager.setRoomState(code, 'CONFIG');
+      room.gameState.currentGame = gameType;
+
+      io.to(code).emit('room:state-changed', {
+        state: 'CONFIG',
+        gameType,
+        hostPlayerId: room.hostPlayerId
       });
-      game.scores = scores;
-
-      callback({ success: true, totalQuestions: questions.length });
-
-      console.log(`Quiz created for room ${roomCode} with ${questions.length} questions`);
-    } catch (error) {
-      console.error('Error starting quiz:', error);
-      callback({ success: false, error: error.message });
-    }
-  });
-
-  // QUIZ: Update settings (Player 1 only)
-  socket.on('quiz:update-settings', ({ roomCode, playerId, settings }, callback) => {
-    try {
-      const room = roomManager.getRoom(roomCode);
-      if (!room) {
-        return callback({ success: false, error: 'Room not found' });
-      }
-
-      // Check if settings are already locked
-      if (room.quizSettings.locked) {
-        return callback({ success: false, error: 'Settings are locked' });
-      }
-
-      // Check if this is Player 1
-      const firstPlayerId = roomManager.getFirstPlayerId(roomCode);
-      if (playerId !== firstPlayerId) {
-        return callback({ success: false, error: 'Only Player 1 can change settings' });
-      }
-
-      // Update settings
-      const updatedSettings = roomManager.updateQuizSettings(roomCode, settings);
-      
-      // Broadcast to all players in room
-      io.to(roomCode).emit('quiz:settings-updated', { settings: updatedSettings });
-
-      callback({ success: true, settings: updatedSettings });
-    } catch (error) {
-      callback({ success: false, error: error.message });
-    }
-  });
-
-  // QUIZ: Lock settings (Player 1 only)
-  socket.on('quiz:lock-settings', ({ roomCode, playerId }, callback) => {
-    try {
-      const room = roomManager.getRoom(roomCode);
-      if (!room) {
-        return callback({ success: false, error: 'Room not found' });
-      }
-
-      // Check if this is Player 1
-      const firstPlayerId = roomManager.getFirstPlayerId(roomCode);
-      if (playerId !== firstPlayerId) {
-        return callback({ success: false, error: 'Only Player 1 can lock settings' });
-      }
-
-      // Lock settings
-      roomManager.lockQuizSettings(roomCode);
-      
-      // Broadcast to all players in room
-      io.to(roomCode).emit('quiz:settings-locked', { settings: room.quizSettings });
 
       callback({ success: true });
-    } catch (error) {
-      callback({ success: false, error: error.message });
+    } catch (err) {
+      callback({ success: false, error: err.message });
     }
   });
 
-  // QUIZ: Get settings
-  socket.on('quiz:get-settings', ({ roomCode }, callback) => {
+  /* ---------- UPDATE QUIZ SETTINGS (HOST ONLY) ---------- */
+  socket.on('quiz:update-settings', ({ roomCode, playerId, settings }, callback) => {
     try {
-      const settings = roomManager.getQuizSettings(roomCode);
-      if (!settings) {
-        return callback({ success: false, error: 'Room not found' });
-      }
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
 
-      const firstPlayerId = roomManager.getFirstPlayerId(roomCode);
-      callback({ success: true, settings, firstPlayerId });
-    } catch (error) {
-      callback({ success: false, error: error.message });
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (room.state !== 'CONFIG') return callback({ success: false, error: 'Not in config state' });
+      if (!roomManager.isHost(code, playerId)) return callback({ success: false, error: 'Only host can update settings' });
+
+      roomManager.updateQuizSettings(code, settings);
+
+      io.to(code).emit('quiz:settings-updated', {
+        settings: roomManager.getQuizSettings(code)
+      });
+
+      callback({ success: true });
+    } catch (err) {
+      callback({ success: false, error: err.message });
     }
   });
 
-  // QUIZ: Get current question
-  socket.on('quiz:get-question', ({ roomCode }, callback) => {
-    const question = quizGameManager.getCurrentQuestion(roomCode);
-    if (question) {
-      callback({ success: true, question });
-    } else {
-      callback({ success: false, error: 'No active question' });
+  /* ---------- CONFIRM CONFIG ---------- */
+  socket.on('quiz:confirm-config', ({ roomCode, playerId }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (room.state !== 'CONFIG') return callback({ success: false, error: 'Not in config state' });
+      if (!roomManager.isHost(code, playerId)) return callback({ success: false, error: 'Only host can confirm config' });
+
+      roomManager.confirmQuizSettings(code);
+
+      io.to(code).emit('quiz:config-ready', {
+        settings: roomManager.getQuizSettings(code)
+      });
+
+      callback({ success: true });
+    } catch (err) {
+      callback({ success: false, error: err.message });
     }
   });
 
-  // QUIZ: Submit answer
-  socket.on('quiz:submit-answer', ({ roomCode, playerId, answerIndex }, callback) => {
-    const result = quizGameManager.submitAnswer(roomCode, playerId, answerIndex);
-    
-    if (result) {
+  /* ---------- QUIZ START (HOST ONLY, AFTER CONFIG) ---------- */
+  socket.on('quiz:start', async ({ roomCode, playerId }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (room.state !== 'CONFIG') return callback({ success: false, error: 'Must configure game first' });
+      if (!room.quizSettings.configReady) return callback({ success: false, error: 'Settings not confirmed' });
+      if (!roomManager.isHost(code, playerId)) return callback({ success: false, error: 'Only host can start game' });
+
+      const settings = roomManager.getQuizSettings(code);
+      const questions = await quizGenerator.generateQuestions(10, settings);
+
+      quizGameManager.createGame(code, questions);
+      quizGameManager.startGame(code);
+
+      roomManager.setRoomState(code, 'PLAYING');
+
+      io.to(code).emit('room:state-changed', {
+        state: 'PLAYING'
+      });
+
+      io.to(code).emit('quiz:started', {
+        questions,
+        currentQuestion: quizGameManager.getCurrentQuestion(code)
+      });
+
+      callback({ success: true, questions });
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
+
+  /* ---------- QUIZ ANSWER SUBMISSION ---------- */
+  socket.on('quiz:submit-answer', ({ roomCode, playerId, answerLetter }, callback) => {
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (room.state !== 'PLAYING') return callback({ success: false, error: 'Game not playing' });
+
+      // Convert letter (A/B/C/D) to index (0/1/2/3)
+      const answerIndex = answerLetter.charCodeAt(0) - 65;
+
+      const result = quizGameManager.submitAnswer(code, playerId, answerIndex);
+      if (!result) return callback({ success: false });
+
+      // Send result back to the specific player for immediate feedback
       callback({ success: true, ...result });
-      
-      const game = quizGameManager.getGame(roomCode);
-      const room = roomManager.getRoom(roomCode);
-      
-      if (room && game) {
-        io.to(room.host).emit('quiz:answer-submitted', {
-          playerId,
-          answerIndex,
-          isCorrect: result.isCorrect,
-          scores: game.scores
-        });
+
+      // Notify the host/room about score updates for a live leaderboard
+      const game = quizGameManager.getGame(code);
+      if (game) {
+        io.to(code).emit('quiz:score-update', { scores: game.scores });
       }
-    } else {
-      callback({ success: false, error: 'Failed to submit answer' });
+    } catch (err) {
+      callback({ success: false, error: err.message });
     }
   });
 
-  // QUIZ: Next question
+  /* ---------- NEXT QUESTION (Sync All) ---------- */
   socket.on('quiz:next-question', ({ roomCode }, callback) => {
-    const result = quizGameManager.nextQuestion(roomCode);
-    
-    if (result) {
-      callback({ success: true, ...result });
-      
+    try {
+      const code = String(roomCode || '').toUpperCase();
+      const room = roomManager.getRoom(code);
+
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (room.state !== 'PLAYING') return callback({ success: false, error: 'Game not playing' });
+
+      const result = quizGameManager.nextQuestion(code);
+      if (!result) return callback({ success: false });
+
       if (result.finished) {
-        io.to(roomCode).emit('quiz:finished', {
-          finalScores: result.finalScores
-        });
-        
-        setTimeout(() => {
-          quizGameManager.deleteGame(roomCode);
-        }, 60000);
+        roomManager.setRoomState(code, 'FINISHED');
+        io.to(code).emit('room:state-changed', { state: 'FINISHED' });
+        io.to(code).emit('quiz:finished', { finalScores: result.finalScores });
       } else {
-        const question = quizGameManager.getCurrentQuestion(roomCode);
-        io.to(roomCode).emit('quiz:new-question', { question });
+        // Broadcast the full next-question payload so all clients can sync
+        io.to(code).emit('quiz:new-question', {
+          question: result.question,
+          questionIndex: result.questionIndex,
+          totalQuestions: result.totalQuestions,
+          timeLimit: result.timeLimit
+        });
       }
-    } else {
-      callback({ success: false, error: 'Failed to get next question' });
+
+      callback({ success: true });
+    } catch (err) {
+      callback({ success: false, error: err.message });
     }
   });
 
-  // QUIZ: Get scores
-  socket.on('quiz:get-scores', ({ roomCode }, callback) => {
-    const game = quizGameManager.getGame(roomCode);
-    if (game) {
-      callback({ success: true, scores: game.scores });
-    } else {
-      callback({ success: false, error: 'Game not found' });
-    }
-  });
-
-  // Handle disconnection
+  /* ---------- DISCONNECT ---------- */
   socket.on('disconnect', () => {
-    console.log(`Client disconnected: ${socket.id}`);
+    const info = roomManager.findRoomBySocket(socket.id);
+    if (!info) return;
 
-    const roomInfo = roomManager.findRoomBySocket(socket.id);
-
-    if (roomInfo) {
-      const { code, room, role, playerId } = roomInfo;
-
-      if (role === 'host') {
-        // Host disconnected - notify all players and close room
-        io.to(code).emit('room:closed', {
-          reason: 'Host disconnected'
-        });
-        roomManager.rooms.delete(code);
-        console.log(`Room ${code} closed (host disconnected)`);
-      } else if (role === 'player') {
-        // Player disconnected
-        roomManager.removePlayer(code, playerId);
-        io.to(room.host).emit('player:left', {
-          playerId,
-          players: roomManager.getPlayers(code)
-        });
-      }
+    const { code, role, playerId, room } = info;
+    if (role === "host") {
+      io.to(code).emit("room:closed");
+      roomManager.rooms.delete(code);
+    } else {
+      roomManager.removePlayer(code, playerId);
+      io.to(room.host).emit("player:left", playerId);
     }
-  });
-
-  // Heartbeat for connection monitoring
-  socket.on('ping', (callback) => {
-    callback({ pong: true, timestamp: Date.now() });
   });
 });
 
 const PORT = process.env.PORT || 3000;
-
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 Socket.IO server ready`);
 });

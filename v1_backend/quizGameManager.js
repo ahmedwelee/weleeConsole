@@ -82,9 +82,17 @@ class QuizGameManager {
       return { finished: true, finalScores: game.scores };
     }
 
+    const q = game.questions[game.currentQuestionIndex];
     return {
       finished: false,
-      questionIndex: game.currentQuestionIndex
+      questionIndex: game.currentQuestionIndex,
+      totalQuestions: game.questions.length,
+      question: {
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer
+      },
+      timeLimit: game.timeLimit
     };
   }
 
@@ -92,12 +100,13 @@ class QuizGameManager {
     const game = this.getGame(roomCode);
     if (!game || game.finished) return null;
 
-    const question = game.questions[game.currentQuestionIndex];
+    const q = game.questions[game.currentQuestionIndex];
     return {
       questionIndex: game.currentQuestionIndex,
       totalQuestions: game.questions.length,
-      question: question.question,
-      options: question.options,
+      question: q.question,
+      options: q.options,
+      correctAnswer: q.correctAnswer,
       timeLimit: game.timeLimit
     };
   }

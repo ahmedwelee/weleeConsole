@@ -1,0 +1,99 @@
+.quiz-config-panel {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 40px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.quiz-config-panel h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #333;
+  font-size: 28px;
+}
+
+.config-section {
+  margin-bottom: 25px;
+}
+
+.config-section label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #555;
+  font-size: 16px;
+}
+
+.config-section select {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 16px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.config-section select:hover {
+  border-color: #667eea;
+}
+
+.config-section select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.difficulty-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.diff-btn {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.diff-btn:hover {
+  border-color: #667eea;
+  background: #f8f9ff;
+}
+
+.diff-btn.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.confirm-btn {
+  width: 100%;
+  padding: 15px;
+  margin-top: 30px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.confirm-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.confirm-btn:active {
+  transform: translateY(0);
+}
