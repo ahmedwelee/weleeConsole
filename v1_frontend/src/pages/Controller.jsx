@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import socketService from '../utils/socket.js';
 import QuizController from '../components/QuizController';
+import SpyController from '../components/SpyController';
 import './Controller.css';
 
 function Controller() {
@@ -13,6 +14,7 @@ function Controller() {
   const [playerId, setPlayerId] = useState('');
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
+  const [currentGame, setCurrentGame] = useState(null); // 'quiz' or 'spy'
 
   useEffect(() => {
     const socket = socketService.connect();
@@ -42,9 +44,20 @@ function Controller() {
       navigate('/join');
     });
 
+    // Listen for game started events to determine which controller to show
+    socket.on('quiz:started', () => {
+      setCurrentGame('quiz');
+    });
+
+    socket.on('spy:game-started', () => {
+      setCurrentGame('spy');
+    });
+
     return () => {
       socket.off('room:closed');
-      // Don't disconnect, QuizController needs the connection
+      socket.off('quiz:started');
+      socket.off('spy:game-started');
+      // Don't disconnect, controllers need the connection
     };
   }, [roomCode, playerName, navigate]);
 
@@ -70,12 +83,33 @@ function Controller() {
     );
   }
 
-  // Connected - Show the QuizController (handles all states internally)
+  // Connected - Show appropriate controller based on game type
+  if (currentGame === 'spy') {
+    return (
+      <SpyController 
+        playerId={playerId}
+        roomCode={roomCode}
+      />
+    );
+  }
+
+  if (currentGame === 'quiz') {
+    return (
+      <QuizController 
+        playerId={playerId}
+        roomCode={roomCode}
+      />
+    );
+  }
+
+  // Waiting for game to start
   return (
-    <QuizController 
-      playerId={playerId}
-      roomCode={roomCode}
-    />
+    <div className="controller-waiting">
+      <div className="waiting-icon">⏳</div>
+      <h2>Connected to Room {roomCode}</h2>
+      <p>Player: {playerName}</p>
+      <p>Waiting for host to start the game...</p>
+    </div>
   );
 }
 
