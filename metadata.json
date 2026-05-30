@@ -1,0 +1,8 @@
+{
+  "name": "WeleeConsole",
+  "description": "A local multiplayer game platform where one browser tab acts as the TV/Console and others act as controllers, with mobile phone support via QR codes and room codes.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
